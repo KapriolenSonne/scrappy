@@ -17,6 +17,8 @@
   },
   "homepage": "https://github.com/KapriolenSonne/scrappy#readme",
   "dependencies": {
+    "dotenv": "^16.0.0",
+    "ioredis": "^4.28.5",
     "puppeteer": "^13.5.0"
   }
 }
