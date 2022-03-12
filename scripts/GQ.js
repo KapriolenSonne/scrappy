@@ -127,7 +127,8 @@ const puppeteer = require('puppeteer');
           ...data,
           profileData: {
             ...profileData,
-            username
+            username,
+            dashboardLink,
           }
       }
 
