@@ -120,7 +120,7 @@ const puppeteer = require('puppeteer');
           const hasNoAvatar = document.querySelector('.profile-avatar_empty').length
 
           return {
-              avatar: hasNoAvatar ? avatar : null,
+              avatar: !hasNoAvatar ? avatar : null,
           }
       }).catch(() => console.log("Couldn't fetch profile image"));
 
