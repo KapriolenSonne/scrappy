@@ -20,7 +20,7 @@ const puppeteer = require('puppeteer');
     console.log(participants);
     
     const browser = await puppeteer
-    .launch()
+    .launch({ args: ['--no-sandbox'] })
     .catch(err => console.log(err));
 
     const page = await browser.newPage();
