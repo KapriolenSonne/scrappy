@@ -1,20 +1,21 @@
 require('dotenv').config();
 require('util').inspect.defaultOptions.depth = null;
-const Redis = require("ioredis");
+const Redis = require("redis");
 const puppeteer = require('puppeteer');
-const client = new Redis(process.env.REDIS_URL);
 
 (async () => {
+    const client = Redis.createClient({ url: process.env.REDIS_URL });
+    client.on('error', (err) => console.log('Redis Client Error', err));
+    await client.connect();
     let alreadyAcceptedCookies = false;
-    let result = {};
+    let finalResult = {};
 
     client.on('connect', () => console.log('Connected to REDIS instance'));
-    client.on('error', (err) => console.log(err));
     
-    let participants = await client.lrange('participants',0,-1)
-    .then((result) => result.map(entry => JSON.parse(entry)))
+    let participants = await client.SMEMBERS('users')
     .catch(err => console.log(err));
-    console.log('Fetch participants...')
+
+    console.log('Fetch participants...');
     console.log('Fetched ' + participants.length + ' entries');
     console.log(participants);
     
@@ -25,8 +26,8 @@ const client = new Redis(process.env.REDIS_URL);
     const page = await browser.newPage();
     await page.setViewport({ width: 1920, height: 1080 });
     
-    for (const participant of participants) {
-      const { username, dashboardLink } = participant;
+    for (const username of participants) {
+      const dashboardLink = await client.HGET(`user:${username}`, 'dashboardLink');
       console.log('Scrape: ' + username);
       await page.goto(dashboardLink, { 'waitUntil' : 'networkidle0' });
 
@@ -42,7 +43,7 @@ const client = new Redis(process.env.REDIS_URL);
         const totalPerformance = document.querySelector('.total-return__relative-return > div')?.textContent;
         const absolutePL = parseFloat(document.querySelectorAll('.return-row__absolute-return > span > span')[0].innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
         const performanceSummary = document.querySelectorAll('.return-splitdown__row');
-        const totalInvested = performanceSummary[4].querySelector('.absolute-return > span:last-of-type')?.textContent;
+        // const totalInvested = performanceSummary[4].querySelector('.absolute-return > span:last-of-type')?.textContent;
         const totalDividends = performanceSummary[1].querySelector('.absolute-return > span:last-of-type')?.textContent;
         const parsedPositions = [];
         let cash = 0;
@@ -56,7 +57,7 @@ const client = new Redis(process.env.REDIS_URL);
             const units = entry.querySelector('.position__units-amount')?.textContent;
             const isCashPosition = entry.querySelector('.name-col > .name-col__image')?.dataset?.src.includes('cash') && units == '';
             const value = entry.querySelector('.position-value')?.textContent;
-              //total performance, position performance, dividends
+            
             position.name = isCashPosition ? 'Cash' : name?.replace(/\s+/g, '');
             position.units = units !== '' ? parseFloat(units?.replace(/\s+/g, '')) : null;
             position.value = parseFloat(value?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
@@ -74,7 +75,7 @@ const client = new Redis(process.env.REDIS_URL);
         const performanceWeightedPositions = parsedPositions.filter(entry => entry.units !== null).sort((entryA, entryB) => {
           return entryB.performance - entryA.performance;
         });
-
+        
         const calcTotalInvestment = () => {
           let result = parseFloat(total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
 
@@ -90,19 +91,25 @@ const client = new Redis(process.env.REDIS_URL);
         }
 
         return {
-            positions: parsedPositions,
-            count: positions.length,
+            positions: {
+              entries: parsedPositions,
+              count: Object.keys(parsedPositions).length,
+              stats: {
+                biggestGainer: performanceWeightedPositions.length > 0 ? performanceWeightedPositions[0] : {},
+                biggestLoser: performanceWeightedPositions.length > 0 ? performanceWeightedPositions[performanceWeightedPositions.length-1] : {},
+              }
+            },
             cash: {
               amount: cash,
               percentageOfPortfolio: cash > 0 ? parseFloat((cash/ total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) * 100).toFixed(2) : 0,
             },
-            totalValue: total ? parseFloat(total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null,
-            totalInvested: calcTotalInvestment(),
-            totalDividends: totalDividends ? parseFloat(totalDividends.replace(/[^0-9.-]+/g,"")) : null,
-            absolutePL: absolutePL,
-            totalRelativePerformance: totalPerformance ? parseFloat(totalPerformance.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null,
-            biggestGainer: performanceWeightedPositions[0],
-            biggestLoser: performanceWeightedPositions[performanceWeightedPositions.length-1],
+            total: {
+              value: total ? parseFloat(total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null,
+              invested: calcTotalInvestment(),
+              dividends: totalDividends ? parseFloat(totalDividends.replace(/[^0-9.-]+/g,"")) : null,
+              absolutePerformance: absolutePL,
+              relativePerformance: totalPerformance ? parseFloat(totalPerformance.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null
+            },
         }
       }).catch((error) => console.log(error));
 
@@ -120,12 +127,17 @@ const client = new Redis(process.env.REDIS_URL);
           ...data,
           profileData
       }
-      result = {
-        ...result,
-        [username]: participantData,
+
+      finalResult = {
+        ...finalResult,
+        [username]: JSON.stringify(participantData)
       }
+
+      await client.mSet(finalResult)
+
+      console.log(participantData);
     }
+    client.quit();
     browser.close();
-    console.log(result);
     process.exit(1);
 })();
