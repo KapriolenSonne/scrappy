@@ -80,9 +80,9 @@ const puppeteer = require('puppeteer');
           let result = parseFloat(total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
 
           if (absolutePL > 0) {
-            result = result - absolutePL;
+            result = result - Math.abs(absolutePL);
           } else {
-            result = result + absolutePL;
+            result = result + Math.abs(absolutePL);
           }
 
           result = result - cash;
