@@ -120,13 +120,15 @@ const puppeteer = require('puppeteer');
 
           return {
               avatar: avatar,
-              username: username,
           }
       }).catch(() => console.log("Couldn't fetch profile image"));
 
       const participantData = {
           ...data,
-          profileData
+          profileData: {
+            ...profileData,
+            username
+          }
       }
 
       finalResult = {
