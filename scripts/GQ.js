@@ -117,12 +117,12 @@ const puppeteer = require('puppeteer');
       await page.waitForSelector('.profile-avatar__img');
       const profileData = await page.evaluate(() => {
           const avatar = document.querySelector('.profile-avatar__img').src;
-          const hasNoAvatar = document.querySelector('.profile-avatar_empty').length
+          const hasNoAvatar = document.querySelector('.profile-info > .profile-avatar_empty');
 
           return {
-              avatar: !hasNoAvatar ? avatar : null,
+              avatar: hasNoAvatar ? false : avatar,
           }
-      }).catch(() => console.log("Couldn't fetch profile image"));
+      }).catch((err) => console.log(err));
 
       const participantData = {
           ...data,
