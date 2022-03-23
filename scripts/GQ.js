@@ -2,6 +2,9 @@ require('dotenv').config();
 require('util').inspect.defaultOptions.depth = null;
 const Redis = require("redis");
 const puppeteer = require('puppeteer');
+const axios = require('axios');
+const querystring = require('querystring');
+
 
 (async () => {
     const client = Redis.createClient({ url: process.env.REDIS_URL });
@@ -18,22 +21,28 @@ const puppeteer = require('puppeteer');
     console.log('Fetch participants...');
     console.log('Fetched ' + participants.length + ' entries');
     console.log(participants);
-    
-    const browser = await puppeteer
-    .launch({ args: ['--no-sandbox'] })
-    .catch(err => console.log(err));
 
+    const browser = await puppeteer
+    .launch({
+      headless: true,
+      args: ['--disable-notifications','--disable-client-side-phishing-detection','--no-default-browser-check','--disable-print-preview','--disable-speech-api','--no-sandbox'],
+      userDataDir: './cache'})
+    .catch(err => console.log(err));
+    console.log('Initiate Browser');
     const page = await browser.newPage();
-    await page.setViewport({ width: 1920, height: 1080 });
-    
+    await page.setViewport({ width: 1300, height: 800 });
+    console.log('Browser started');
+
     for (const username of participants) {
       const dashboardLink = await client.HGET(`user:${username}`, 'dashboardLink');
       console.log('Scrape: ' + username);
-      await page.goto(dashboardLink, { 'waitUntil' : 'networkidle0' });
+      await page.goto(dashboardLink, { 'waitUntil' : 'domcontentloaded' });
 
-      if (!alreadyAcceptedCookies) {
+      try {
         await page.waitForSelector('.cookie-control__button--filled');
         await page.click('.cookie-control__button--filled');
+        alreadyAcceptedCookies = true;
+      } catch {
         alreadyAcceptedCookies = true;
       }
 
@@ -142,6 +151,15 @@ const puppeteer = require('puppeteer');
 
       console.log(participantData);
     }
+
+    await axios
+    .get(`https://kapriolen.capital/api/revalidate?secret=${process.env.REVALIDATE_SECRET}`, querystring.stringify({ secret: process.env.REVALIDATE_SECRET }))
+    .then(res => {
+      console.log(`Cache purged`)
+    })
+    .catch((error) => {
+      console.log('Could not purge cache');
+    });
     client.quit();
     browser.close();
     process.exit(1);
