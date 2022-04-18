@@ -154,14 +154,14 @@ const querystring = require('querystring');
       console.log(participantData);
     }
 
-    /*await axios
+    await axios
     .get(`https://kapriolen.capital/api/revalidate?secret=${process.env.REVALIDATE_SECRET}`, querystring.stringify({ secret: process.env.REVALIDATE_SECRET }))
     .then(res => {
       console.log(`Cache purged`)
     })
     .catch((error) => {
       console.log('Could not purge cache');
-    });*/
+    });
     client.quit();
     browser.close();
     process.exit(1);
