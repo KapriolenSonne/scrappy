@@ -24,7 +24,7 @@ const querystring = require('querystring');
 
     const browser = await puppeteer
     .launch({
-      headless: true,
+      headless: false,
       args: ['--disable-notifications','--disable-client-side-phishing-detection','--no-default-browser-check','--disable-print-preview','--disable-speech-api','--no-sandbox'],
       userDataDir: './cache'})
     .catch(err => console.log(err));
@@ -61,6 +61,7 @@ const querystring = require('querystring');
 
         for (const entry of positions) {
             const position = {};
+            const ISIN = entry.querySelector('.name-col__image').dataset.src.match(/([A-Z,0-9])\w+/g)[0].substring(0,12);
             const name = entry.querySelector('.name-col > .position-name')?.textContent;
             const performance = entry.querySelector('.row .relative-return')?.textContent
             const units = entry.querySelector('.position__units-amount')?.textContent;
@@ -71,6 +72,7 @@ const querystring = require('querystring');
             position.units = units !== '' ? parseFloat(units?.replace(/\s+/g, '')) : null;
             position.value = parseFloat(value?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
             position.performance = parseFloat(performance?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
+            position.ISIN = isCashPosition ? null : ISIN;
 
             if (isCashPosition) {
               cash += parseFloat(position.value);
@@ -152,14 +154,14 @@ const querystring = require('querystring');
       console.log(participantData);
     }
 
-    await axios
+    /*await axios
     .get(`https://kapriolen.capital/api/revalidate?secret=${process.env.REVALIDATE_SECRET}`, querystring.stringify({ secret: process.env.REVALIDATE_SECRET }))
     .then(res => {
       console.log(`Cache purged`)
     })
     .catch((error) => {
       console.log('Could not purge cache');
-    });
+    });*/
     client.quit();
     browser.close();
     process.exit(1);
