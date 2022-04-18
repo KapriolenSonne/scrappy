@@ -24,7 +24,7 @@ const querystring = require('querystring');
 
     const browser = await puppeteer
     .launch({
-      headless: false,
+      headless: true,
       args: ['--disable-notifications','--disable-client-side-phishing-detection','--no-default-browser-check','--disable-print-preview','--disable-speech-api','--no-sandbox'],
       userDataDir: './cache'})
     .catch(err => console.log(err));
