@@ -36,7 +36,7 @@ const querystring = require('querystring');
     for (const username of participants) {
       const dashboardLink = await client.HGET(`user:${username}`, 'dashboardLink');
       console.log('Scrape: ' + username);
-      await page.goto(dashboardLink, { 'waitUntil' : 'domcontentloaded' });
+      await page.goto(dashboardLink, { 'waitUntil' : 'networkidle0' });
 
       try {
         await page.waitForSelector('.cookie-control__button--filled');
@@ -48,6 +48,7 @@ const querystring = require('querystring');
 
       const data = await page.evaluate(() => {
         const positions = document.querySelectorAll('.position-row');
+        const securityCards = document.querySelector('.dashboard-positions__table_mobile').querySelectorAll('.security-card__wrapper');
         const total = document.querySelector('.dashboard-performance-overview__total > span')?.textContent;
         const totalPerformance = document.querySelector('.total-return__relative-return > div')?.textContent;
         const absolutePL = parseFloat(document.querySelectorAll('.return-row__absolute-return > span > span')[0].innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
@@ -59,20 +60,20 @@ const querystring = require('querystring');
 
         // total performance
 
-        for (const entry of positions) {
+        for (const [index, entry] of positions.entries()) {
             const position = {};
-            const ISIN = entry.querySelector('.name-col__image').dataset.src.match(/([A-Z,0-9])\w+/g)[0].substring(0,12);
             const name = entry.querySelector('.name-col > .position-name')?.textContent;
             const performance = entry.querySelector('.row .relative-return')?.textContent
             const units = entry.querySelector('.position__units-amount')?.textContent;
             const isCashPosition = entry.querySelector('.name-col > .name-col__image')?.dataset?.src.includes('cash') && units == '';
+            //const ISIN = isCashPosition ? null : securityCards[index]?.href.match(/([A-Z,0-9])\w+/g)[0];
             const value = entry.querySelector('.position-value')?.textContent;
             
             position.name = isCashPosition ? 'Cash' : name?.replace(/\s+/g, '');
             position.units = units !== '' ? parseFloat(units?.replace(/\s+/g, '')) : null;
             position.value = parseFloat(value?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
             position.performance = parseFloat(performance?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
-            position.ISIN = isCashPosition ? null : ISIN;
+            //position.ISIN = ISIN;
 
             if (isCashPosition) {
               cash += parseFloat(position.value);
