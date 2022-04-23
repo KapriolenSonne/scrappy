@@ -53,7 +53,7 @@ const querystring = require('querystring');
         const totalPerformance = document.querySelector('.total-return__relative-return > div')?.textContent;
         const absolutePL = parseFloat(document.querySelectorAll('.return-row__absolute-return > span > span')[0].innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
         const performanceSummary = document.querySelectorAll('.return-splitdown__row');
-        // const totalInvested = performanceSummary[4].querySelector('.absolute-return > span:last-of-type')?.textContent;
+        const totalInvested = performanceSummary[4].querySelector('.absolute-return > span:last-of-type')?.textContent;
         const totalDividends = performanceSummary[1].querySelector('.absolute-return > span:last-of-type')?.textContent;
         const parsedPositions = [];
         let cash = 0;
@@ -66,14 +66,14 @@ const querystring = require('querystring');
             const performance = entry.querySelector('.row .relative-return')?.textContent
             const units = entry.querySelector('.position__units-amount')?.textContent;
             const isCashPosition = entry.querySelector('.name-col > .name-col__image')?.dataset?.src.includes('cash') && units == '';
-            //const ISIN = isCashPosition ? null : securityCards[index]?.href.match(/([A-Z,0-9])\w+/g)[0];
+            const ISIN = isCashPosition ? null : securityCards[index]?.href.match(/([A-Z,0-9])\w+/g)[0];
             const value = entry.querySelector('.position-value')?.textContent;
             
             position.name = isCashPosition ? 'Cash' : name?.replace(/\s+/g, '');
             position.units = units !== '' ? parseFloat(units?.replace(/\s+/g, '')) : null;
             position.value = parseFloat(value?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
             position.performance = parseFloat(performance?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
-            //position.ISIN = ISIN;
+            position.ISIN = ISIN;
 
             if (isCashPosition) {
               cash += parseFloat(position.value);
