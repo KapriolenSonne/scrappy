@@ -15,8 +15,7 @@ const querystring = require('querystring');
 
     client.on('connect', () => console.log('Connected to REDIS instance'));
     
-    let participants = await client.SMEMBERS('users')
-    .catch(err => console.log(err));
+    let participants = await client.SMEMBERS('users').catch(err => console.log(err));
 
     console.log('Fetch participants...');
     console.log('Fetched ' + participants.length + ' entries');
@@ -24,22 +23,22 @@ const querystring = require('querystring');
 
     const browser = await puppeteer
     .launch({
-      headless: true,
+      headless: process.env.ENVIRONMENT !== 'dev',
       args: ['--disable-notifications','--disable-client-side-phishing-detection','--no-default-browser-check','--disable-print-preview','--disable-speech-api','--no-sandbox'],
       userDataDir: './cache'})
     .catch(err => console.log(err));
     console.log('Initiate Browser');
     const page = await browser.newPage();
-    await page.setViewport({ width: 1300, height: 800 });
+    await page.setViewport({ width: 375, height: 667 });
     console.log('Browser started');
 
     for (const username of participants) {
       const dashboardLink = await client.HGET(`user:${username}`, 'dashboardLink');
       console.log('Scrape: ' + username);
-      await page.goto(dashboardLink, { 'waitUntil' : 'networkidle0' });
+      await page.goto(dashboardLink, { 'waitUntil' : 'networkidle2' });
 
       try {
-        await page.waitForSelector('.cookie-control__button--filled');
+        await page.waitForSelector('.cookie-control__button--filled', { timeout: 5000 });
         await page.click('.cookie-control__button--filled');
         alreadyAcceptedCookies = true;
       } catch {
