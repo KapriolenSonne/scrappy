@@ -7,10 +7,12 @@ const querystring = require('querystring');
 
 
 (async () => {
+    console.time('Complete Runtime');
     const client = Redis.createClient({ url: process.env.REDIS_URL });
     client.on('error', (err) => console.log('Redis Client Error', err));
     await client.connect();
     let alreadyAcceptedCookies = false;
+    let switchedToRelative = false;
     let finalResult = {};
 
     client.on('connect', () => console.log('Connected to REDIS instance'));
@@ -20,37 +22,75 @@ const querystring = require('querystring');
     console.log('Fetch participants...');
     console.log('Fetched ' + participants.length + ' entries');
     console.log(participants);
-
+    console.time('runtime');
     const browser = await puppeteer
     .launch({
       headless: process.env.ENVIRONMENT !== 'dev',
-      args: ['--disable-notifications','--disable-client-side-phishing-detection','--no-default-browser-check','--disable-print-preview','--disable-speech-api','--no-sandbox'],
+      args: [
+        '--disable-notifications',
+        '--disable-client-side-phishing-detection',
+        '--no-default-browser-check',
+        '--disable-print-preview',
+        '--disable-speech-api',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--disable-gpu'
+      ],
       userDataDir: './cache'})
     .catch(err => console.log(err));
     console.log('Initiate Browser');
     const page = await browser.newPage();
     await page.setViewport({ width: 375, height: 667 });
+    console.timeEnd('runtime');
     console.log('Browser started');
 
     for (const username of participants) {
       const dashboardLink = await client.HGET(`user:${username}`, 'dashboardLink');
       console.log('Scrape: ' + username);
       await page.goto(dashboardLink, { 'waitUntil' : 'networkidle2' });
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       try {
-        await page.waitForSelector('.cookie-control__button--filled', { timeout: 5000 });
+        await page.waitForSelector('.cookie-control__button--filled', { timeout: 2000 });
         await page.click('.cookie-control__button--filled');
         alreadyAcceptedCookies = true;
       } catch {
         alreadyAcceptedCookies = true;
       }
 
+      try {
+        await page.waitForSelector('.absolute-return_pill', { timeout: 1000 });
+        await page.click('.absolute-return_pill');
+        switchedToRelative = true;
+    } catch {
+      switchedToRelative = true;
+    }
+      /*
+      try {
+        await page.waitForSelector('.profile__failed-load', { timeout: 1000 });
+        console.log('Profile found!');
+      } catch(e) {
+        console.log(e.name);
+        console.log('Profile not found - skip');
+        continue;
+      }*/
+
       const data = await page.evaluate(() => {
+        let intradayPerformance = document.querySelector('.dashboard-performance-overview__relative-return');
+
+        if (intradayPerformance == null) {
+          document.querySelector('.dashboard-performance-overview__inner-container').click();
+        } 
+
+        intradayPerformance = document.querySelector('.dashboard-performance-overview__relative-return')?.innerText;
         const positions = document.querySelectorAll('.position-row');
         const securityCards = document.querySelector('.dashboard-positions__table_mobile').querySelectorAll('.security-card__wrapper');
         const total = document.querySelector('.dashboard-performance-overview__total > span')?.textContent;
         const totalPerformance = document.querySelector('.total-return__relative-return > div')?.textContent;
-        const absolutePL = parseFloat(document.querySelectorAll('.return-row__absolute-return > span > span')[0].innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
+        const absolutePL = document.querySelector('.return-splitdown__row > .relative-return').innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
         const performanceSummary = document.querySelectorAll('.return-splitdown__row');
         const totalInvested = performanceSummary[4].querySelector('.absolute-return > span:last-of-type')?.textContent;
         const totalDividends = performanceSummary[1].querySelector('.absolute-return > span:last-of-type')?.textContent;
@@ -119,21 +159,27 @@ const querystring = require('querystring');
               invested: calcTotalInvestment(),
               dividends: totalDividends ? parseFloat(totalDividends.replace(/[^0-9.-]+/g,"")) : null,
               absolutePerformance: absolutePL,
-              relativePerformance: totalPerformance ? parseFloat(totalPerformance.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null
+              relativePerformance: totalPerformance ? parseFloat(totalPerformance.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null,
+              intradayPerformance: intradayPerformance ? parseFloat(intradayPerformance.replace('%', '')) : null,
             },
         }
       }).catch((error) => console.log(error));
-
-      await page.goto(`https://app.getquin.com/u/${username}`, { 'waitUntil' : 'networkidle0' });
-      await page.waitForSelector('.profile-avatar__img');
-      const profileData = await page.evaluate(() => {
-          const avatar = document.querySelector('.profile-avatar__img').src;
-          const hasNoAvatar = document.querySelector('.profile-info > .profile-avatar_empty');
-
-          return {
-              avatar: hasNoAvatar ? false : avatar,
-          }
-      }).catch((err) => console.log(err));
+      
+      try {
+        await page.goto(`https://app.getquin.com/u/${username}`, { 'waitUntil' : 'networkidle0' });
+        await page.waitForSelector('.profile-avatar__img', { timeout: 2000 });
+  
+        profileData = await page.evaluate(() => {
+            const avatar = document.querySelector('.profile-avatar__img').src;
+            const hasNoAvatar = document.querySelector('.profile-info > .profile-avatar_empty');
+  
+            return {
+                avatar: hasNoAvatar ? false : avatar,
+            }
+        }).catch((err) => console.log(err));
+      } catch(err) {
+        console.log(err);
+      }
 
       const participantData = {
           ...data,
@@ -154,6 +200,8 @@ const querystring = require('querystring');
       console.log(participantData);
     }
 
+    console.timeEnd('Complete Runtime');
+    
     await axios
     .get(`https://kapriolen.capital/api/revalidate?secret=${process.env.REVALIDATE_SECRET}`, querystring.stringify({ secret: process.env.REVALIDATE_SECRET }))
     .then(res => {
