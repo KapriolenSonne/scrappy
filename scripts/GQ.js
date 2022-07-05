@@ -5,7 +5,6 @@ const puppeteer = require('puppeteer');
 const axios = require('axios');
 const querystring = require('querystring');
 
-
 (async () => {
     console.time('Complete Runtime');
     const client = Redis.createClient({ url: process.env.REDIS_URL });
@@ -68,36 +67,26 @@ const querystring = require('querystring');
     } catch {
       switchedToRelative = true;
     }
-      /*
-      try {
-        await page.waitForSelector('.profile__failed-load', { timeout: 1000 });
-        console.log('Profile found!');
-      } catch(e) {
-        console.log(e.name);
-        console.log('Profile not found - skip');
-        continue;
-      }*/
-
       const data = await page.evaluate(() => {
         let intradayPerformance = document.querySelector('.dashboard-performance-overview__relative-return');
+        //const absolutePL = document.querySelector('.return-splitdown__row > .relative-return').innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
 
         if (intradayPerformance == null) {
           document.querySelector('.dashboard-performance-overview__inner-container').click();
         } 
 
         intradayPerformance = document.querySelector('.dashboard-performance-overview__relative-return')?.innerText;
+
+        const totalPerformance = document.querySelector('.total-return__splitdown .return-row__absolute-return .absolute-return')?.innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
         const positions = document.querySelectorAll('.position-row');
         const securityCards = document.querySelector('.dashboard-positions__table_mobile').querySelectorAll('.security-card__wrapper');
         const total = document.querySelector('.dashboard-performance-overview__total > span')?.textContent;
-        const totalPerformance = document.querySelector('.total-return__relative-return > div')?.textContent;
-        const absolutePL = document.querySelector('.return-splitdown__row > .relative-return').innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
         const performanceSummary = document.querySelectorAll('.return-splitdown__row');
+        const absolutePL = document.querySelector('.return-splitdown__row > .relative-return').innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
         const totalInvested = performanceSummary[4].querySelector('.absolute-return > span:last-of-type')?.textContent;
         const totalDividends = performanceSummary[1].querySelector('.absolute-return > span:last-of-type')?.textContent;
         const parsedPositions = [];
         let cash = 0;
-
-        // total performance
 
         for (const [index, entry] of positions.entries()) {
             const position = {};
@@ -158,8 +147,8 @@ const querystring = require('querystring');
               value: total ? parseFloat(total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null,
               invested: calcTotalInvestment(),
               dividends: totalDividends ? parseFloat(totalDividends.replace(/[^0-9.-]+/g,"")) : null,
-              absolutePerformance: absolutePL,
-              relativePerformance: totalPerformance ? parseFloat(totalPerformance.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null,
+              absolutePerformance: parseFloat(totalPerformance),
+              relativePerformance: parseFloat(absolutePL),
               intradayPerformance: intradayPerformance ? parseFloat(intradayPerformance.replace('%', '')) : null,
             },
         }
@@ -200,17 +189,17 @@ const querystring = require('querystring');
       console.log(participantData);
     }
 
-    console.timeEnd('Complete Runtime');
-    
-    await axios
-    .get(`https://kapriolen.capital/api/revalidate?secret=${process.env.REVALIDATE_SECRET}`, querystring.stringify({ secret: process.env.REVALIDATE_SECRET }))
-    .then(res => {
-      console.log(`Cache purged`)
-    })
-    .catch((error) => {
-      console.log('Could not purge cache');
-    });
-    client.quit();
-    browser.close();
-    process.exit(1);
+  console.timeEnd('Complete Runtime');
+  
+  await axios
+  .get(`https://kapriolen.capital/api/revalidate?secret=${process.env.REVALIDATE_SECRET}`, querystring.stringify({ secret: process.env.REVALIDATE_SECRET }))
+  .then(res => {
+    console.log(`Cache purged`)
+  })
+  .catch((error) => {
+    console.log('Could not purge cache');
+  });
+  client.quit();
+  browser.close();
+  process.exit(1);
 })();
