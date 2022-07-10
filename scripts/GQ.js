@@ -28,7 +28,7 @@ const { Cluster } = require('puppeteer-cluster');
 
     const cluster = await Cluster.launch({
       concurrency: Cluster.CONCURRENCY_PAGE,
-      maxConcurrency: 5,
+      maxConcurrency: 2,
       puppeteerOptions: {
         headless: process.env.ENVIRONMENT !== 'dev',
         args: [
@@ -46,7 +46,8 @@ const { Cluster } = require('puppeteer-cluster');
         ],
         userDataDir: './cache',
         monitor: false,
-        retryLimit: 1,
+        retryLimit: 3,
+        retryDelay: 100,
         workerCreationDelay: 100,
       },
     });
@@ -61,6 +62,7 @@ const { Cluster } = require('puppeteer-cluster');
       let profileData = {};
       const { username } = dashboardEntries.find(entry => entry.link === url);
       console.log('Scrape: ' + username);
+      console.log(url);
       await page.setViewport({ width: 375, height: 667 });
       await page.goto(url, { 'waitUntil' : 'networkidle2' });
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -83,89 +85,88 @@ const { Cluster } = require('puppeteer-cluster');
 
       const data = await page.evaluate(() => {
         let intradayPerformance = document.querySelector('.dashboard-performance-overview__relative-return');
-        //const absolutePL = document.querySelector('.return-splitdown__row > .relative-return').innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
 
-      if (intradayPerformance == null) {
-        document.querySelector('.dashboard-performance-overview__inner-container').click();
-      } 
+        if (intradayPerformance == null) {
+          document.querySelector('.dashboard-performance-overview__inner-container').click();
+        } 
 
-      intradayPerformance = document.querySelector('.dashboard-performance-overview__relative-return')?.innerText;
+        intradayPerformance = document.querySelector('.dashboard-performance-overview__relative-return')?.innerText;
 
-      const totalPerformance = document.querySelector('.total-return__splitdown .return-row__absolute-return .absolute-return')?.innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
-      const positions = document.querySelectorAll('.position-row');
-      const securityCards = document.querySelector('.dashboard-positions__table_mobile').querySelectorAll('.security-card__wrapper');
-      const total = document.querySelector('.dashboard-performance-overview__total > span')?.textContent;
-      const performanceSummary = document.querySelectorAll('.return-splitdown__row');
-      const absolutePL = document.querySelector('.return-splitdown__row > .relative-return').innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
-      const totalInvested = performanceSummary[4].querySelector('.absolute-return > span:last-of-type')?.textContent;
-      const totalDividends = performanceSummary[1].querySelector('.absolute-return > span:last-of-type')?.textContent;
-      const parsedPositions = [];
-      let cash = 0;
+        const totalPerformance = document.querySelector('.total-return__splitdown .return-row__absolute-return .absolute-return')?.innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
+        const positions = document.querySelectorAll('.position-row');
+        const securityCards = document.querySelector('.dashboard-positions__table_mobile').querySelectorAll('.security-card__wrapper');
+        const total = document.querySelector('.dashboard-performance-overview__total > span')?.textContent;
+        const performanceSummary = document.querySelectorAll('.return-splitdown__row');
+        const absolutePL = document.querySelector('.return-splitdown__row > .relative-return').innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
+        const totalInvested = performanceSummary[4].querySelector('.absolute-return > span:last-of-type')?.textContent;
+        const totalDividends = performanceSummary[1].querySelector('.absolute-return > span:last-of-type')?.textContent;
+        const parsedPositions = [];
+        let cash = 0;
 
-      for (const [index, entry] of positions.entries()) {
-          const position = {};
-          const name = entry.querySelector('.name-col > .position-name')?.textContent;
-          const performance = entry.querySelector('.row .relative-return')?.textContent
-          const units = entry.querySelector('.position__units-amount')?.textContent;
-          const isCashPosition = entry.querySelector('.name-col > .name-col__image')?.dataset?.src.includes('cash') && units == '';
-          const ISIN = isCashPosition ? null : securityCards[index]?.href.match(/([A-Z,0-9])\w+/g)[0];
-          const value = entry.querySelector('.position-value')?.textContent;
-          
-          position.name = isCashPosition ? 'Cash' : name?.replace(/\s+/g, '');
-          position.units = units !== '' ? parseFloat(units?.replace(/\s+/g, '')) : null;
-          position.value = parseFloat(value?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
-          position.performance = parseFloat(performance?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
-          position.ISIN = ISIN;
+        for (const [index, entry] of positions.entries()) {
+            const position = {};
+            const name = entry.querySelector('.name-col > .position-name')?.textContent;
+            const performance = entry.querySelector('.row .relative-return')?.textContent
+            const units = entry.querySelector('.position__units-amount')?.textContent;
+            const isCashPosition = entry.querySelector('.name-col > .name-col__image')?.dataset?.src.includes('cash') && units == '';
+            const ISIN = isCashPosition ? null : securityCards[index]?.href.match(/([A-Z,0-9])\w+/g)[0];
+            const value = entry.querySelector('.position-value')?.textContent;
+            
+            position.name = isCashPosition ? 'Cash' : name?.replace(/\s+/g, '');
+            position.units = units !== '' ? parseFloat(units?.replace(/\s+/g, '')) : null;
+            position.value = parseFloat(value?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
+            position.performance = parseFloat(performance?.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
+            position.ISIN = ISIN;
 
-          if (isCashPosition) {
-            cash += parseFloat(position.value);
-          }
-          if (name) {
-            parsedPositions.push(position);
-          }
-      }
-
-      // highest to lowest
-      const performanceWeightedPositions = parsedPositions.filter(entry => entry.units !== null).sort((entryA, entryB) => {
-        return entryB.performance - entryA.performance;
-      });
-      
-      const calcTotalInvestment = () => {
-        let result = parseFloat(total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
-
-        if (absolutePL > 0) {
-          result = result - Math.abs(absolutePL);
-        } else {
-          result = result + Math.abs(absolutePL);
+            if (isCashPosition) {
+              cash += parseFloat(position.value);
+            }
+            if (name) {
+              parsedPositions.push(position);
+            }
         }
 
-        result = result - cash;
+        // highest to lowest
+        const performanceWeightedPositions = parsedPositions.filter(entry => entry.units !== null).sort((entryA, entryB) => {
+          return entryB.performance - entryA.performance;
+        });
+        
+        const calcTotalInvestment = () => {
+          let result = parseFloat(total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,""));
 
-        return parseFloat(result).toFixed(2);
-      }
-
-      return {
-        positions: {
-          entries: parsedPositions,
-          count: Object.keys(parsedPositions).length,
-          stats: {
-            biggestGainer: performanceWeightedPositions.length > 0 ? performanceWeightedPositions[0] : {},
-            biggestLoser: performanceWeightedPositions.length > 0 ? performanceWeightedPositions[performanceWeightedPositions.length-1] : {},
+          if (absolutePL > 0) {
+            result = result - Math.abs(absolutePL);
+          } else {
+            result = result + Math.abs(absolutePL);
           }
-        },
-        cash: {
-          amount: cash,
-          percentageOfPortfolio: cash > 0 ? parseFloat((cash/ total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) * 100).toFixed(2) : 0,
-        },
-        total: {
-          value: total ? parseFloat(total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null,
-          invested: calcTotalInvestment(),
-          dividends: totalDividends ? parseFloat(totalDividends.replace(/[^0-9.-]+/g,"")) : null,
-          absolutePerformance: parseFloat(totalPerformance),
-          relativePerformance: parseFloat(absolutePL),
-          intradayPerformance: intradayPerformance ? parseFloat(intradayPerformance.replace('%', '')) : null,
-        },
-      }
+
+          result = result - cash;
+
+          return parseFloat(result).toFixed(2);
+        }
+
+        return {
+          positions: {
+            entries: parsedPositions,
+            count: Object.keys(parsedPositions).length,
+            stats: {
+              biggestGainer: performanceWeightedPositions.length > 0 ? performanceWeightedPositions[0] : {},
+              biggestLoser: performanceWeightedPositions.length > 0 ? performanceWeightedPositions[performanceWeightedPositions.length-1] : {},
+            }
+          },
+          cash: {
+            amount: cash,
+            percentageOfPortfolio: cash > 0 ? parseFloat((cash/ total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) * 100).toFixed(2) : 0,
+          },
+          total: {
+            value: total ? parseFloat(total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null,
+            invested: calcTotalInvestment(),
+            dividends: totalDividends ? parseFloat(totalDividends.replace(/[^0-9.-]+/g,"")) : null,
+            absolutePerformance: parseFloat(totalPerformance),
+            relativePerformance: parseFloat(absolutePL),
+            intradayPerformance: intradayPerformance ? parseFloat(intradayPerformance.replace('%', '')) : null,
+          },
+        }
       });
       try {
         await page.goto(`https://app.getquin.com/u/${username}`, { 'waitUntil' : 'networkidle0' });
@@ -188,7 +189,7 @@ const { Cluster } = require('puppeteer-cluster');
         profileData: {
           ...profileData,
           username,
-          dashboardLink,
+          dashboardLink: url,
         }
       };
       console.log('[' + username + ']');
@@ -218,6 +219,5 @@ const { Cluster } = require('puppeteer-cluster');
   });
   client.quit();
   await cluster.close();
-  console.log
-  //process.exit(1);
+  process.exit(1);
 })();
