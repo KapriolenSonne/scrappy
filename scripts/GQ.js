@@ -28,7 +28,7 @@ const { Cluster } = require('puppeteer-cluster');
 
     const cluster = await Cluster.launch({
       concurrency: Cluster.CONCURRENCY_PAGE,
-      maxConcurrency: 2,
+      maxConcurrency: 5,
       puppeteerOptions: {
         headless: process.env.ENVIRONMENT !== 'dev',
         args: [
@@ -64,7 +64,7 @@ const { Cluster } = require('puppeteer-cluster');
       console.log('Scrape: ' + username);
       console.log(url);
       await page.setViewport({ width: 375, height: 667 });
-      await page.goto(url, { 'waitUntil' : 'networkidle2' });
+      await page.goto(url, { 'waitUntil' : 'networkidle2', timeout: 0 });
       await new Promise(resolve => setTimeout(resolve, 2000));
       // cookies dialog handling
       try {
@@ -169,7 +169,7 @@ const { Cluster } = require('puppeteer-cluster');
         }
       });
       try {
-        await page.goto(`https://app.getquin.com/u/${username}`, { 'waitUntil' : 'networkidle0' });
+        await page.goto(`https://app.getquin.com/u/${username}`, { 'waitUntil' : 'networkidle0', timeout: 0 });
         await page.waitForSelector('.profile-avatar__img', { timeout: 2000 });
 
         profileData = await page.evaluate(() => {
