@@ -28,7 +28,8 @@ const { Cluster } = require('puppeteer-cluster');
 
     const cluster = await Cluster.launch({
       concurrency: Cluster.CONCURRENCY_PAGE,
-      maxConcurrency: 5,
+      timeout: 180000,
+      maxConcurrency: 1,
       puppeteerOptions: {
         headless: process.env.ENVIRONMENT !== 'dev',
         args: [
