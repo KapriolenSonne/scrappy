@@ -29,7 +29,7 @@ const { Cluster } = require('puppeteer-cluster');
     const cluster = await Cluster.launch({
       concurrency: Cluster.CONCURRENCY_PAGE,
       timeout: 180000,
-      maxConcurrency: 1,
+      maxConcurrency: 10,
       puppeteerOptions: {
         headless: process.env.ENVIRONMENT !== 'dev',
         args: [
@@ -171,10 +171,10 @@ const { Cluster } = require('puppeteer-cluster');
       });
       try {
         await page.goto(`https://app.getquin.com/u/${username}`, { 'waitUntil' : 'networkidle0', timeout: 0 });
-        await page.waitForSelector('.profile-avatar__img', { timeout: 2000 });
+        await page.waitForSelector("div[class*='Logo_logo']", { timeout: 3000 });
 
         profileData = await page.evaluate(() => {
-            const avatar = document.querySelector('.profile-avatar__img').src;
+            const avatar = document.querySelector("div[class*='Logo_logo'] img").src;
             const hasNoAvatar = document.querySelector('.profile-info > .profile-avatar_empty');
 
             return {

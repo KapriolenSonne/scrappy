@@ -17,8 +17,12 @@
   },
   "homepage": "https://github.com/KapriolenSonne/scrappy#readme",
   "dependencies": {
+    "@google-cloud/local-auth": "^2.1.0",
     "axios": "^0.26.1",
     "dotenv": "^16.0.0",
+    "googleapis": "^105.0.0",
+    "graphql": "^16.6.0",
+    "graphql-request": "^5.0.0",
     "ioredis": "^4.28.5",
     "puppeteer": "^13.5.0",
     "puppeteer-cluster": "^0.23.0",
