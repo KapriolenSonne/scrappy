@@ -93,13 +93,13 @@ const { Cluster } = require('puppeteer-cluster');
 
         intradayPerformance = document.querySelector('.dashboard-performance-overview__relative-return')?.innerText;
 
-        const totalPerformance = document.querySelector('.total-return__splitdown .return-row__absolute-return .absolute-return')?.innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
+        const totalPerformance = document.querySelector('.return-splitdown__relative-return').innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
         const positions = document.querySelectorAll('.position-row');
         const securityCards = document.querySelector('.dashboard-positions__table_mobile').querySelectorAll('.security-card__wrapper');
         const total = document.querySelector('.dashboard-performance-overview__total > span')?.textContent;
         const performanceSummary = document.querySelectorAll('.return-splitdown__row');
-        const absolutePL = document.querySelector('.return-splitdown__row > .relative-return').innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
-        const totalInvested = performanceSummary[4].querySelector('.absolute-return > span:last-of-type')?.textContent;
+        const absolutePL = performanceSummary[0].querySelector('.absolute-return > span:last-of-type').innerText.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"");
+        //const totalInvested = performanceSummary[4].querySelector('.absolute-return > span:last-of-type')?.textContent;
         const totalDividends = performanceSummary[1].querySelector('.absolute-return > span:last-of-type')?.textContent;
         const parsedPositions = [];
         let cash = 0;
