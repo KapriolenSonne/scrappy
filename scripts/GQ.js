@@ -163,8 +163,8 @@ const { Cluster } = require('puppeteer-cluster');
             value: total ? parseFloat(total.replace(/\s+/g, '').replace(/[^0-9.-]+/g,"")) : null,
             invested: calcTotalInvestment(),
             dividends: totalDividends ? parseFloat(totalDividends.replace(/[^0-9.-]+/g,"")) : null,
-            absolutePerformance: parseFloat(totalPerformance),
-            relativePerformance: parseFloat(absolutePL),
+            absolutePerformance: parseFloat(absolutePL),
+            relativePerformance: parseFloat(totalPerformance),
             intradayPerformance: intradayPerformance ? parseFloat(intradayPerformance.replace('%', '')) : null,
           },
         }
